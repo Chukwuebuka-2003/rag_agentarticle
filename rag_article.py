@@ -1,83 +1,66 @@
 import streamlit as st
-from main import ArticleCrew
 import os
-import uuid
+from main import ArticleCrew
 
-# API keys from Streamlit secrets
+# Load API keys from Streamlit secrets
 os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
 os.environ["GEMINI_API_KEY"] = st.secrets["GEMINI_API_KEY"]
+
+# App title
+st.title("PDF to Article Generator")
 
 # Initialize session state for conversations
 if "conversations" not in st.session_state:
     st.session_state.conversations = {}
 
-if "current_conversation" not in st.session_state:
-    st.session_state.current_conversation = []
-
-# Function to load a previous conversation
+# Load previous conversation if selected
 def load_conversation(conversation_id):
     st.session_state.current_conversation = st.session_state.conversations[conversation_id]
 
-# Sidebar for previous conversations
+# Sidebar for managing conversations
 st.sidebar.title("Previous Conversations")
-
 if st.session_state.conversations:
     conversation_ids = list(st.session_state.conversations.keys())
     selected_conversation = st.sidebar.selectbox("Select a conversation:", conversation_ids)
     if st.sidebar.button("Load Conversation"):
         load_conversation(selected_conversation)
-else:
-    st.sidebar.write("No previous conversations")
 
-# Main application title and description
-st.title("Create Articles Powered by RAG")
-st.write("RAG is an interesting concept, but now think about creating articles based on the contents of the RAG, which is powered by AI Agents.")
-
-# PDF Upload Section
-uploaded_file = st.file_uploader("Upload a PDF file", type="pdf")
-
-if uploaded_file is not None:
-    # Save the uploaded PDF temporarily
-    temp_file_path = f"temp_{uuid.uuid4()}.pdf"
-    with open(temp_file_path, "wb") as f:
+# File uploader for PDF
+uploaded_file = st.file_uploader("Choose a PDF file", type="pdf")
+if uploaded_file:
+    # Save uploaded file temporarily
+    temp_path = f"/tmp/{uploaded_file.name}"
+    with open(temp_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
+    st.success(f"PDF uploaded and ready to process: {uploaded_file.name}")
 
-    st.success(f"Uploaded PDF: {uploaded_file.name}")
+    # User input for search query
+    user_input = st.text_input("Enter your search query:")
+    if user_input:
+        # Initialize ArticleCrew with inputs and file path
+        inputs = {"user_input": user_input, "file_path": temp_path}
+        article_crew = ArticleCrew(inputs=inputs)
 
-    # Process the PDF file with ArticleCrew
-    st.write("Processing the PDF file...")
-    research_crew = ArticleCrew(inputs="", file_path=temp_file_path)  # Pass file_path
+        try:
+            # Execute the CrewAI workflow
+            response = article_crew.run()
+            st.write("### Final Output:")
+            st.markdown(response)  # Display the output
 
-    response = research_crew.run()
+            # Store the current conversation in session state
+            if "current_conversation" not in st.session_state:
+                st.session_state.current_conversation = []
 
-    st.session_state.current_conversation.append({"role": "assistant", "content": response})
-    with st.chat_message("assistant"):
-        st.markdown(response)
+            st.session_state.current_conversation.append({"role": "user", "content": user_input})
+            st.session_state.current_conversation.append({"role": "assistant", "content": response})
 
+            # Save conversation with a unique ID
+            import uuid
+            conversation_id = str(uuid.uuid4())
+            st.session_state.conversations[conversation_id] = st.session_state.current_conversation
 
-
-# Display conversation history
-for message in st.session_state.current_conversation:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-# Handle user input in the chat
-if prompt := st.chat_input("Enter your question"):
-    st.session_state.current_conversation.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
-
-    # Combine inputs and run RAG
-    inputs = "\n".join([msg["content"] for msg in st.session_state.current_conversation if msg["role"] == "user"])
-    research_crew = ArticleCrew(inputs)
-    response = research_crew.run()
-
-    # Display and save the assistant's response
-    st.session_state.current_conversation.append({"role": "assistant", "content": response})
-    with st.chat_message("assistant"):
-        st.markdown(response)
-
-    # Save the conversation
-    conversation_id = str(uuid.uuid4())
-    st.session_state.conversations[conversation_id] = st.session_state.current_conversation
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
+else:
+    st.info("Please upload a PDF to begin.")
