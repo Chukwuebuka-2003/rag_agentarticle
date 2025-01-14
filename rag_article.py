@@ -43,20 +43,19 @@ if uploaded_file is not None:
     with open(temp_file_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
 
-    # Display a success message
     st.success(f"Uploaded PDF: {uploaded_file.name}")
 
     # Process the PDF file with ArticleCrew
     st.write("Processing the PDF file...")
-    research_crew = ArticleCrew(inputs=temp_file_path)
+    research_crew = ArticleCrew(inputs="", file_path=temp_file_path)  # Pass file_path
 
-    # Run the ArticleCrew with the PDF content
     response = research_crew.run()
 
-    # Show the response
     st.session_state.current_conversation.append({"role": "assistant", "content": response})
     with st.chat_message("assistant"):
         st.markdown(response)
+
+
 
 # Display conversation history
 for message in st.session_state.current_conversation:
