@@ -3,7 +3,7 @@ from main import ArticleCrew
 import os
 import uuid
 
-# Set API keys from Streamlit secrets
+# API keys from Streamlit secrets
 os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
 os.environ["GEMINI_API_KEY"] = st.secrets["GEMINI_API_KEY"]
@@ -46,11 +46,17 @@ if uploaded_file is not None:
     # Display a success message
     st.success(f"Uploaded PDF: {uploaded_file.name}")
 
-    # Optionally, process the PDF file
+    # Process the PDF file with ArticleCrew
     st.write("Processing the PDF file...")
-    # Example: Pass the file path to the ArticleCrew for further processing
-    research_crew = ArticleCrew(file_path=temp_file_path)
+    research_crew = ArticleCrew(inputs=temp_file_path)
 
+    # Run the ArticleCrew with the PDF content
+    response = research_crew.run()
+
+    # Show the response
+    st.session_state.current_conversation.append({"role": "assistant", "content": response})
+    with st.chat_message("assistant"):
+        st.markdown(response)
 
 # Display conversation history
 for message in st.session_state.current_conversation:
